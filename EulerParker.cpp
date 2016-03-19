@@ -22,7 +22,7 @@ int main( int argc, char **argv ) {
 
 	vector<vector<vector<int>>> dls_vec;
 	// DLS from [Brown et al 1992]
-	/*vector<vector<int>> a{ 
+	vector<vector<int>> a{ 
 		{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 },
 		{ 2, 3, 4, 9, 8, 1, 0, 5, 6, 7 },
 		{ 3, 4, 9, 8, 2, 7, 1, 0, 5, 6 },
@@ -34,7 +34,7 @@ int main( int argc, char **argv ) {
 		{ 9, 8, 7, 6, 5, 4, 3, 2, 1, 0 },
 		{ 1, 2, 3, 4, 9, 0, 5, 6, 7, 8 } 
 	};
-	dls_vec.push_back(a);*/
+	dls_vec.push_back(a);
 
 #ifdef _DEBUG
 	argc = 2;
