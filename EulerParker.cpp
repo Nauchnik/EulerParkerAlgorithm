@@ -9,13 +9,29 @@ using namespace std;
 
 const int DLS_order = 10;
 static inline double cpuTime(void) { return (double)clock() / CLOCKS_PER_SEC; }
+
+/*class DLX_column {
+public:
+	int size;
+	int column_number;
+	int row_id;
+
+	DLX_column * Left;
+	DLX_column * Right;
+	DLX_column * Up;
+	DLX_column * Down;
+	DLX_column * Column;
+};*/
+
 vector<vector<int>> tr(10000, vector<int>(10)); 
 vector<int> ltr(10);
 vector<int> hb(11);
 vector<vector<vector<int>>> orts(10000);
 void readDlsFromFile(string dls_file_name, vector<vector<vector<int>>> &dls_vec);
-int getOrt();
-void getTrans(vector<vector<int>> a, bool diag);
+vector<vector<int>> getTrans_mod(vector<vector<int>> a, bool diag);
+static bool nextij(int &i, int &j, vector<int> &ct, vector<vector<int>> & a, vector<bool>&co, vector<bool> & x);
+bool nextTrans_ext(vector<vector<int>> & a, vector<int> &ct, vector<bool> & co, vector<bool>& x, bool &diag);
+//void search(int k, DLX_column &h, vector<DLX_column*> &ps, vector<vector<int>> &tvr);
 
 int main( int argc, char **argv ) {
 	bool isSearchingDiagMates = true;
@@ -60,21 +76,22 @@ int main( int argc, char **argv ) {
 	cout << "dls_vec.size() " << dls_vec.size() << endl;
 	double gt1;
 	double gt2;
-	double gt3;
+	//double gt3;
 	int sum;
+	std::vector<std::vector<int>> transv_vec;
 	
 	for (unsigned dls_vec_index = 0; dls_vec_index < dls_vec.size(); dls_vec_index++) {
 		cout << "dls_vec_index " << dls_vec_index << endl;
 		gt1 = cpuTime();
-		getTrans(dls_vec[dls_vec_index], isSearchingDiagMates);
+		transv_vec = getTrans_mod(dls_vec[dls_vec_index], isSearchingDiagMates);
 		gt2 = cpuTime();
 		sum = 0;
 		for (unsigned i = 0; i < ltr.size(); i++)
 			sum += ltr[i];
-		cout << "Generation of " << sum << " transversals took " << gt2 - gt1 << " seconds" << endl;
-		int t = getOrt();
-		gt3 = cpuTime();
-		cout << "Generation of orthogonal pairs took " << gt3 - gt2 << " seconds" << endl;
+		cout << "Generation of " << transv_vec.size() << " transversals took " << gt2 - gt1 << " seconds" << endl;
+		//int t = getOrt();
+		//gt3 = cpuTime();
+		//cout << "Generation of orthogonal pairs took " << gt3 - gt2 << " seconds" << endl;
 	}
 	
 	cout << endl << "Finish";
@@ -115,160 +132,183 @@ void readDlsFromFile(string dls_file_name, vector<vector<vector<int>>> &dls_vec)
 	dls_file.close();
 }
 
-void getTrans(vector<vector<int>> a, bool diag) 
+bool initTrans(vector<vector<int>> & a, vector<int> &ct, vector<bool> & co, vector<bool>& x) 
 {
-	int i;
-	int j;
-	int k;
-	int c;
-	int d;
-	int t;
+	int i = 0;
+	int j = -1;
+	for (unsigned i = 0; i < x.size(); i++) {
+		co[i] = false;
+		x[i] = false;
+		ct[i] = 0;
+	}
+	while ((i<10) && (nextij(i, j, ct, a, co, x) != false)) {
+		ct[i] = j;
+		i++;
+		j = -1;
+	}
+	if (i == 10) return true;
+	else return false;
+}
+
+vector<vector<int>> getTrans_mod(vector<vector<int>> a, bool diag) 
+{
+	vector<vector<int>> res(5600, vector<int>(10));
+	vector<int> ltr(10);
 	vector<int> h(10);
+	vector<bool> co(10);
 	vector<bool> x(10);
-	
-	cout << "sizes of transversals blocks" << endl;
-	hb[0] = 0;
-	for (t = 0; t < 10; t++) {
-		for (k = 0; k < 10; k++) {
-			x[k] = false;
+
+	int num = 0;
+
+	//bool t = initTrans(a, h, co, x);
+	bool t = initTrans(a, h, co, x);
+	if (t == true) {
+		bool acc = true;
+		if (diag == true) {
+			int md = 0;
+			int ad = 0;
+			for (unsigned l = 0; l < h.size(); l++) {
+				if (h[l] == l) { md++; }
+				if (h[l] == h.size() - l - 1) { ad++; }
+			}
+			if ((md != 1) || (ad != 1)) { acc = false; }
 		}
-		c = 0;
-		h[0] = t;
-		x[a[0][t]] = true;
+		if (acc == true) {
+			res[num] = h;
+			num++;
+		}
 
-		i = 1;
-		h[i] = 0;
+		//	while (nextTrans(a, h, co, x) == true) {
+		while (nextTrans_ext(a, h, co, x, diag) == true) {
+			res[num] = h;
+			num++;
+		}
+	}
+	res.erase(res.begin() + num, res.end());
+	return res;
+}
 
-	label1:
-		if (i == 0) goto label4;
-		j = h[i];
-	label2:
+bool nextTrans_ext(vector<vector<int>> & a, vector<int> &ct, vector<bool> & co, vector<bool>& x, bool &diag) 
+{
+	// a - square
+	// ct = current transversal, coordinates correspond to column number
+	// co - column occupied vector
+	// x - aux vector
+	int d = ct.size() - 1;
+	int i = d - 1;
+	x[a[d][ct[d]]] = false;
+	x[a[i][ct[i]]] = false;
+	co[ct[i]] = false;
+	co[ct[d]] = false;
+	int j = ct[i];
+	bool out = true;
+	bool res = false;
+
+	while (!res) {
+		if (nextij(i, j, ct, a, co, x) == true) {
+
+			ct[i] = j;
+			i++;
+			j = -1;
+			if ((i == 10) && (diag == false)) { res = true; }
+			if ((i == 10) && (diag == true)) {
+				int md = 0;
+				int ad = 0;
+				for (unsigned l = 0; l < ct.size(); l++) {
+					if (ct[l] == l) { md++; }
+					if (ct[l] == ct.size() - l - 1) { ad++; }
+				}
+				if ((md == 1) && (ad == 1)) { res = true; }
+			}
+		}
+		else {
+			res = true;
+			out = false;
+		}
+
+	}
+	return out;
+}
+
+static bool nextij(int &i, int &j, vector<int> &ct, vector<vector<int>> & a, vector<bool>&co, vector<bool> & x) 
+{
+	int dim = x.size();
+	bool r = false;
+
+	while ((r == false) && (j < dim)) {
+		j++;
 		if (j == 10) {
 			i--;
-			x[a[i][h[i]]] = false;
-			h[i]++;
-			goto label1;
-		}
-		if (x[a[i][j]] == true) {
-			j++;
-			goto label2;
-		}
-		for (k = 0; k < i; k++) {
-			if (h[k] == j) {
-				j++;
-				goto label2;
+			if (i < 0) {
+				r = true;
+			}
+			else {
+				co[ct[i]] = false;
+				x[a[i][ct[i]]] = false;
+				j = ct[i];
 			}
 		}
-
-		h[i] = j;
-		x[a[i][j]] = true;
-
-		if (i == 9) {
-			if (diag == true) {
-				d = 0;
-				for (k = 0; k < 10; k++) {
-					if (k == h[k]) {
-						d++;
-					}
-				}
-				if (d != 1)
-					goto label3;
-
-				d = 0;
-				for (k = 0; k < 10; k++) {
-					if (k == h[9 - k]) {
-						d++;
-					}
-				}
-				if (d != 1)
-					goto label3;
+		else {
+			if ((co[j] == false) && (x[a[i][j]] == false)) {
+				co[j] = true;
+				x[a[i][j]] = true;
+				r = true;
 			}
-			//cout << "Transversal found!" << endl;
-			for (k = 0; k < 10; k++) {
-				//		cout << h[k] << " ";
-				tr[hb[t] + c][k] = h[k];
-			}
-			//	cout << endl;
-			c++;
 		}
-
-	label3:
-		if (i == 9)
-		{
-			x[a[i][h[i]]] = false;
-			j++;
-			goto label2;
-		}
-		i++;
-		h[i] = 0;
-		goto label1;
-
-	label4:
-		ltr[t] = c;
-		cout << c << endl;
-		hb[t + 1] = hb[t] + c;
 	}
+	if (i < 0) return false;
+	else return true;
 }
 
-int getOrt() 
+/*
+void search(int k, DLX_column &h, vector<DLX_column*> &ps, vector<vector<int>> &tvr) 
 {
-	int i;
-	int ii;
-	int k;
-	int l;
-	vector<int> h(11);
-	vector<int> hb(11);
-	vector<vector<int>> b(10, vector<int>(10));
-	int c;
+	//pd = partial solution
+	if (k > 10) {
+		cout << "we are in trouble" << endl;
 
-	hb[0] = 0;
-	c = 0;
-	for (k = 1; k <= 10; k++) {
-		hb[k] = hb[k - 1] + ltr[k - 1];
 	}
-	i = 0;
-	h[0] = 0;
-
-label1:
-	//{i - ый блок от hb[i] до hb[i + 1] - 1, h[i] - рассматриваемая тр.}
-	//h - это массив индексов трансверсалей, которые образуют текущее разбиение
-	ii = h[i];
-label2:
-
-	if (ii >= hb[i + 1]) {
-		if (i == 0) {
-			cout << c << " orthogonal mates" << endl;
-			return c;
+	//	cout << "Search " << k << endl;
+	if (h.Right == &h) {
+		vector<int> tmpv;
+		for (int i = 0; i < ps.size(); i++) {
+			tmpv.push_back(ps[i]->row_id);
 		}
-		//cout << endl << "exceeded block " << i;
-		i--;
-		h[i]++;
-		goto label1;
+		tvr.push_back(tmpv);
+		//cout << tvr.size() << endl;
+		//print_solution(ps);
 	}
-	//{сравнение с предыдущими трансверсалями}
-	for (k = 0; k < i; k++) {
-		for (l = 0; l < 10; l++) {
-			if (tr[h[k]][l] == tr[ii][l]) {
-				ii++;
-				goto label2;
+	else {
+		DLX_column * c = NULL;
+		choose_c(h, c);
+		//	cout << "picked column " << c->column_number << endl;
+		cover(c);
+		DLX_column * r = c->Down;
+		while (r != c) {
+			ps.push_back(r);
+			DLX_column * j;
+			j = r->Right;
+			while (j != r) {
+				cover(j->Column);
+				j = j->Right;
 			}
-		}
-	}
-	h[i] = ii;
-	if (i == 9) {
-		for (k = 0; k < 10; k++) {
-			for (l = 0; l < 10; l++) {
-				b[l][tr[h[k]][l]] = k;
+
+			search(k + 1, h, ps, tvr);
+
+			r = ps.back();
+			//questionable.
+			ps.pop_back();
+			c = r->Column;
+
+			j = r->Left;
+			while (j != r) {
+				uncover(j->Column);
+				j = j->Left;
 			}
+			r = r->Down;
 		}
-		c++;
-		vector<vector<int>> a = b;
-		orts[c] = a;
-		//cout << c << endl;
-		h[i]++;
-		goto label1;
+		uncover(c);
+		//return;
 	}
-	i++;
-	h[i] = hb[i];
-	goto label1;
 }
+*/
