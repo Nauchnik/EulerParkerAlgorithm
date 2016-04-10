@@ -161,29 +161,27 @@ vector<vector<int>> getTrans_mod(vector<vector<int>> a, bool diag)
 	int num = 0;
 
 	//bool t = initTrans(a, h, co, x);
-	bool t = initTrans(a, h, co, x);
-	if (t == true) {
-		bool acc = true;
-		if (diag == true) {
-			int md = 0;
-			int ad = 0;
-			for (unsigned l = 0; l < h.size(); l++) {
-				if (h[l] == l) { md++; }
-				if (h[l] == h.size() - l - 1) { ad++; }
-			}
-			if ((md != 1) || (ad != 1)) { acc = false; }
+	initTrans(a, h, co, x);
+	bool acc = true;
+	if (diag == true) {
+		int md = 0;
+		int ad = 0;
+		for (unsigned l = 0; l < h.size(); l++) {
+			if (h[l] == l) { md++; }
+			if (h[l] == h.size() - l - 1) { ad++; }
 		}
-		if (acc == true) {
-			res[num] = h;
-			num++;
-		}
-
-		//	while (nextTrans(a, h, co, x) == true) {
-		while (nextTrans_ext(a, h, co, x, diag) == true) {
-			res[num] = h;
-			num++;
-		}
+		if ((md != 1) || (ad != 1)) { acc = false; }
 	}
+	if (acc == true) {
+		res[num] = h;
+		num++;
+	}
+
+	while (nextTrans_ext(a, h, co, x, diag) == true) {
+		res[num] = h;
+		num++;
+	}
+
 	res.erase(res.begin() + num, res.end());
 	return res;
 }
