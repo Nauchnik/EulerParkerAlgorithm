@@ -10,28 +10,15 @@ using namespace std;
 const int DLS_order = 10;
 static inline double cpuTime(void) { return (double)clock() / CLOCKS_PER_SEC; }
 
-/*class DLX_column {
-public:
-	int size;
-	int column_number;
-	int row_id;
-
-	DLX_column * Left;
-	DLX_column * Right;
-	DLX_column * Up;
-	DLX_column * Down;
-	DLX_column * Column;
-};*/
-
-vector<vector<int>> tr(10000, vector<int>(10)); 
+//vector<vector<int>> tr(10000, vector<int>(10)); 
 vector<int> ltr(10);
 vector<int> hb(11);
 vector<vector<vector<int>>> orts(10000);
 void readDlsFromFile(string dls_file_name, vector<vector<vector<int>>> &dls_vec);
-vector<vector<int>> getTrans_mod(vector<vector<int>> a, bool diag);
+vector<vector<int>> getTrans_mod(vector<vector<int>> a, vector<int> &ltr, bool diag);
 static bool nextij(int &i, int &j, vector<int> &ct, vector<vector<int>> & a, vector<bool>&co, vector<bool> & x);
 bool nextTrans_ext(vector<vector<int>> & a, vector<int> &ct, vector<bool> & co, vector<bool>& x, bool &diag);
-//void search(int k, DLX_column &h, vector<DLX_column*> &ps, vector<vector<int>> &tvr);
+int getOrt(vector<vector<int>> &trv, vector<int> &ltr, vector<vector<int>>&tr, vector<vector<vector<int>>> &orts);
 
 int main( int argc, char **argv ) {
 	bool isSearchingDiagMates = true;
@@ -74,26 +61,29 @@ int main( int argc, char **argv ) {
 	}
 	cout << "isSearchingDiagMates " << isSearchingDiagMates << endl;
 	cout << "dls_vec.size() " << dls_vec.size() << endl;
-	double gt1;
-	double gt2;
 	//double gt3;
 	int sum;
 	std::vector<std::vector<int>> transv_vec;
-	
+	double start_time = cpuTime();
+
 	for (unsigned dls_vec_index = 0; dls_vec_index < dls_vec.size(); dls_vec_index++) {
 		cout << "dls_vec_index " << dls_vec_index << endl;
-		gt1 = cpuTime();
-		transv_vec = getTrans_mod(dls_vec[dls_vec_index], isSearchingDiagMates);
-		gt2 = cpuTime();
+		//gt1 = cpuTime();
+		vector<int> ltr(10);
+		transv_vec = getTrans_mod(dls_vec[dls_vec_index], ltr, isSearchingDiagMates);
+		//gt2 = cpuTime();
 		sum = 0;
 		for (unsigned i = 0; i < ltr.size(); i++)
 			sum += ltr[i];
-		cout << "Generation of " << transv_vec.size() << " transversals took " << gt2 - gt1 << " seconds" << endl;
-		//int t = getOrt();
+		//cout << "Generation of " << transv_vec.size() << " transversals took " << gt2 - gt1 << " seconds" << endl;
+		vector<vector<int>> trv;
+		int t = getOrt(trv, ltr, transv_vec, orts);
+		std::cout << "orts.size() " << t << std::endl;
 		//gt3 = cpuTime();
 		//cout << "Generation of orthogonal pairs took " << gt3 - gt2 << " seconds" << endl;
 	}
-	
+
+	cout << "Total time " << cpuTime() - start_time << " seconds" << endl;
 	cout << endl << "Finish";
 	return 0;
 }
@@ -150,10 +140,9 @@ bool initTrans(vector<vector<int>> & a, vector<int> &ct, vector<bool> & co, vect
 	else return false;
 }
 
-vector<vector<int>> getTrans_mod(vector<vector<int>> a, bool diag) 
+vector<vector<int>> getTrans_mod(vector<vector<int>> a, vector<int> &ltr, bool diag)
 {
 	vector<vector<int>> res(5600, vector<int>(10));
-	vector<int> ltr(10);
 	vector<int> h(10);
 	vector<bool> co(10);
 	vector<bool> x(10);
@@ -176,12 +165,13 @@ vector<vector<int>> getTrans_mod(vector<vector<int>> a, bool diag)
 		res[num] = h;
 		num++;
 	}
-
+	
 	while (nextTrans_ext(a, h, co, x, diag) == true) {
+		ltr[h[0]]++;
 		res[num] = h;
 		num++;
 	}
-
+	
 	res.erase(res.begin() + num, res.end());
 	return res;
 }
@@ -258,55 +248,67 @@ static bool nextij(int &i, int &j, vector<int> &ct, vector<vector<int>> & a, vec
 	else return true;
 }
 
-/*
-void search(int k, DLX_column &h, vector<DLX_column*> &ps, vector<vector<int>> &tvr) 
+int getOrt(vector<vector<int>> &trv, vector<int> &ltr, vector<vector<int>>&tr, vector<vector<vector<int>>> &orts) 
 {
-	//pd = partial solution
-	if (k > 10) {
-		cout << "we are in trouble" << endl;
+	int i;
+	int ii;
+	int k;
+	int l;
+	vector<int> h(11);
+	vector<int> hb(11);
+	vector<vector<int>> b(10, vector<int>(10));
+	int c;
 
+	hb[0] = 0;
+	c = 0;
+	for (k = 1; k <= 10; k++) {
+		hb[k] = hb[k - 1] + ltr[k - 1];
 	}
-	//	cout << "Search " << k << endl;
-	if (h.Right == &h) {
-		vector<int> tmpv;
-		for (int i = 0; i < ps.size(); i++) {
-			tmpv.push_back(ps[i]->row_id);
+	i = 0;
+	h[0] = 0;
+
+label1:
+	//{i - ый блок от hb[i] до hb[i + 1] - 1, h[i] - рассматриваемая тр.}
+	//h - это массив индексов трансверсалей, которые образуют текущее разбиение
+	ii = h[i];
+label2:
+
+	if (ii >= hb[i + 1]) {
+		if (i == 0) {
+			return c;
 		}
-		tvr.push_back(tmpv);
-		//cout << tvr.size() << endl;
-		//print_solution(ps);
+		//cout << endl << "exceeded block " << i;
+		i--;
+		h[i]++;
+		goto label1;
 	}
-	else {
-		DLX_column * c = NULL;
-		choose_c(h, c);
-		//	cout << "picked column " << c->column_number << endl;
-		cover(c);
-		DLX_column * r = c->Down;
-		while (r != c) {
-			ps.push_back(r);
-			DLX_column * j;
-			j = r->Right;
-			while (j != r) {
-				cover(j->Column);
-				j = j->Right;
+	//{сравнение с предыдущими трансверсалями}
+	for (k = 0; k < i; k++) {
+		for (l = 0; l < 10; l++) {
+			if (tr[h[k]][l] == tr[ii][l]) {
+				ii++;
+				goto label2;
 			}
-
-			search(k + 1, h, ps, tvr);
-
-			r = ps.back();
-			//questionable.
-			ps.pop_back();
-			c = r->Column;
-
-			j = r->Left;
-			while (j != r) {
-				uncover(j->Column);
-				j = j->Left;
-			}
-			r = r->Down;
 		}
-		uncover(c);
-		//return;
 	}
+	h[i] = ii;
+	if (i == 9) {
+		trv.push_back(h);
+		for (k = 0; k < 10; k++) {
+			//	cout << h[k] << " ";
+			for (l = 0; l < 10; l++) {
+				b[l][tr[h[k]][l]] = k;
+			}
+		}
+		//	cout << endl;
+		c++;
+		vector<vector<int>> a = b;
+		orts[c] = a;
+		//cout << c << endl;
+		h[i]++;
+		goto label1;
+	}
+	i++;
+	h[i] = hb[i];
+	goto label1;
 }
-*/
